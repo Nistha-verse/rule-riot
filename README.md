@@ -127,10 +127,74 @@ node dist/src/cli.js verify --input discovery.json
 
 `validate` accepts either a raw rule array or `{ "rules": [...] }`.
 `simulate` accepts a `SimulationRequest`, `search` accepts a `SearchRequest`,
-and `verify` accepts a `SimulationTrace` or a found search result. There is no
-HTTP API in this backend: adding a server would not provide value for the
-current reproducible CLI workflow and would add lifecycle state that the
-product does not yet require.
+and `verify` accepts a `SimulationTrace` or a found search result.
+
+## HTTP API
+
+The stateless Fastify API exposes the same production functions for a future
+frontend without introducing a database or asynchronous fake job state. Start
+it with:
+
+```sh
+npm run api
+# or: HOST=127.0.0.1 PORT=3000 npm run api
+```
+
+The versioned endpoints are:
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/health` | Process and engine readiness |
+| `GET` | `/api/v1/rules` | Supported vocabulary and HTTP limits |
+| `POST` | `/api/v1/validate` | Validate a rule array or `{ "rules": [...] }` |
+| `POST` | `/api/v1/simulate` | Run `runSimulation` |
+| `POST` | `/api/v1/search` | Run `runSearch` |
+| `POST` | `/api/v1/verify` | Run `verifyReplay` on a trace or found result |
+| `GET` | `/api/v1/docs` | Machine-readable concise contract |
+
+POST requests require `Content-Type: application/json`. Successful simulation
+and search responses preserve the engine's honest terminal statuses: a
+`limit-exhausted` simulation and a `no-match` or `budget-exhausted` search are
+HTTP `200` responses because computation completed honestly. Invalid requests
+are `422`, malformed JSON is `400`, unsupported media types are `415`, an
+oversized body is `413`, replay mismatches are `409`, and unexpected failures
+are sanitized `500` responses. Error bodies have this shape:
+
+```json
+{
+  "error": {
+    "code": "invalid-input",
+    "message": "Simulation request validation failed",
+    "issues": [{ "path": "request.config.maxEvents", "message": "..." }],
+    "requestId": "req-1"
+  }
+}
+```
+
+The HTTP body limit is `1,048,576` bytes. Interactive HTTP limits are lower
+than the library's local limits: at most 400 initial/simulation entities, 20,000
+simulation steps, 100,000 simulation events, 16 search rules, 500 candidates,
+500 evaluations, 5,000 search steps, 50,000 search events, 200 search entities,
+and 5,000 trace entries for verification. The exact values are returned by
+`/api/v1/rules` and `/api/v1/docs`. These are protective synchronous-request
+limits, not a claim that arbitrarily large searches are safe to run in a web
+server. A future job/worker architecture would be required for larger work.
+
+Example requests:
+
+```sh
+curl http://localhost:3000/api/v1/health
+curl http://localhost:3000/api/v1/rules
+curl -X POST http://localhost:3000/api/v1/search \
+  -H 'content-type: application/json' \
+  --data-binary @examples/search-request.json
+```
+
+API tests run against the real in-process Fastify handlers and production engine:
+
+```sh
+npm run api:test
+```
 
 ## Setup and development commands
 

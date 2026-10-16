@@ -8,3 +8,5 @@ export { validateSearchRequest } from "./search/validate.js";
 export * from "./search/types.js";
 export { verifyReplay } from "./trace/replay.js";
 export type { ReplayResult } from "./trace/replay.js";
+export { createApiApp } from "./server/app.js";
+export { API_BODY_LIMIT_BYTES, API_LIMITS, API_VERSION } from "./server/contracts.js";

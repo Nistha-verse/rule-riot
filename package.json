@@ -13,10 +13,15 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test \"dist/test/*.test.js\"",
     "start": "node dist/src/cli.js",
-    "discovery": "npm run --silent build && node dist/src/cli.js search --input examples/search-request.json"
+    "discovery": "npm run --silent build && node dist/src/cli.js search --input examples/search-request.json",
+    "api": "npm run --silent build && node dist/src/server/main.js",
+    "api:test": "npm run --silent build && node --test dist/test/api.test.js"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "fastify": "5.12.7"
   }
 }

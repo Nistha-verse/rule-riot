@@ -1,7 +1,13 @@
-.PHONY: test build typecheck discovery docker-build docker-run
+.PHONY: test api-test api build typecheck discovery docker-build docker-run
 
 test:
 	npm test
+
+api-test:
+	npm run api:test
+
+api:
+	npm run api
 
 build:
 	npm run build
