@@ -1,4 +1,8 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
+import fastifyStatic from "@fastify/static";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ENGINE_VERSION } from "../version.js";
 import {
   REQUEST_SCHEMA_VERSION,
@@ -88,6 +92,11 @@ export function createApiApp(dependencies: Partial<ApiDependencies> = {}, option
     logger: false,
     requestIdHeader: "x-request-id",
   });
+
+  const staticRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../client");
+  if (existsSync(staticRoot)) {
+    app.register(fastifyStatic, { root: staticRoot, prefix: "/", decorateReply: false });
+  }
 
   app.addHook("onRequest", async (request, reply) => {
     const allowedOrigin = options.allowedOrigin ?? process.env.RULE_RIOT_CORS_ORIGIN;

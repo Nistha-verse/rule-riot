@@ -8,20 +8,24 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test \"dist/test/*.test.js\"",
     "start": "node dist/src/cli.js",
     "discovery": "npm run --silent build && node dist/src/cli.js search --input examples/search-request.json",
     "api": "npm run --silent build && node dist/src/server/main.js",
-    "api:test": "npm run --silent build && node --test dist/test/api.test.js"
+    "api:test": "npm run --silent build && node --test dist/test/api.test.js",
+    "dev": "vite --host 127.0.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite": "8.3.4"
   },
   "dependencies": {
+    "@dimforge/rapier2d-compat": "0.21.0",
+    "@fastify/static": "10.1.6",
     "fastify": "5.12.7"
   }
 }

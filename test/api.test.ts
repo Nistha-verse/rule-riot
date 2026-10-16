@@ -54,6 +54,10 @@ function json(response: { body: string }): unknown {
 }
 
 test("serves health, rules, and API documentation", async () => {
+  const frontend = await app.inject({ method: "GET", url: "/" });
+  assert.equal(frontend.statusCode, 200);
+  assert.match(frontend.body, /RULE RIOT|Rule Riot/);
+
   const health = await app.inject({ method: "GET", url: "/api/v1/health" });
   assert.equal(health.statusCode, 200);
   assert.deepEqual(json(health), { status: "ok", apiVersion: "v1", engineVersion: ENGINE_VERSION, requestSchemaVersion: 1, traceSchemaVersion: 1 });

@@ -1,9 +1,9 @@
 # Rule Riot backend
 
-Rule Riot is a deterministic, open-source simulation engine that searches
+Rule Riot is a deterministic, open-source physics playground that searches
 combinations of validated state-transition rules and records the causal events
-behind interesting outcomes. This repository contains the backend only; no
-frontend is included.
+behind interesting outcomes. The repository contains a playable browser
+vertical slice, the real backend engine, and a stateless HTTP API.
 
 ## Product overview
 
@@ -13,8 +13,9 @@ the catalogue. A discovery is valid only when the production simulation
 actually reaches the objective; the search does not generate a prewritten
 story or event trace.
 
-The repository is backend-only. It intentionally has no frontend, persistent
-database, cloud service, blockchain, paid API, or HTTP server.
+The product intentionally has no account flow, persistent database, cloud
+service, blockchain, paid API, or client-side secrets. Local campaign progress
+is optional, versioned `localStorage` only.
 
 ## Architecture
 
@@ -27,7 +28,12 @@ The backend is a small TypeScript/Node.js application with these boundaries:
   construction.
 - `src/search/` — candidate generation, objective scoring, and search budgets.
 - `src/trace/` — canonical event traces and deterministic replay verification.
+- `src/server/` — Fastify API, static frontend host, and isolated search worker.
+- `src/client/` — native TypeScript browser app, Rapier arena, API client,
+  campaign, sandbox, compiler, and replay inspector.
 - `src/cli.ts` — JSON-oriented command-line boundary for the real engine.
+- `index.html`, `src/client/styles.css`, `vite.config.ts` — the warm tactile
+  browser shell and production client build.
 - `test/` — unit and end-to-end tests that exercise the production modules.
 
 Key invariants are deterministic ordering, validated data-only rules (never
@@ -66,6 +72,51 @@ the current vocabulary does not use randomness.
 Every successful or limit-terminated run already contains state-before/state-
 after snapshots and scheduled-event details in its structured trace. Search,
 replay, and the CLI all use the same production engine APIs.
+
+## Browser game and physics integration
+
+The browser vertical slice lives in `src/client/` and is served by the same
+Fastify process after `npm run build`. It has Campaign, Play, Sandbox,
+Compiler, and Replay views; rule cards, reset/step/pause/bump controls, a
+causal timeline, discovery metrics, and replay verification feedback. The UI
+uses a warm parchment/ink/clay/cobalt palette with illustrated silhouettes,
+printed-card rule controls, restrained texture, keyboard-visible focus states,
+and a `prefers-reduced-motion` fallback. It deliberately avoids neon,
+synthwave, glassmorphism, and decorative fake metrics.
+
+The live arena uses `@dimforge/rapier2d-compat` `0.21.0`, a maintained Rust/WASM
+2D rigid-body engine. `src/client/physics.ts` owns one Rapier world with fixed
+60 Hz stepping, dynamic rigid bodies, ball colliders, restitution, friction,
+four fixed boundary colliders, collision events, impulses, an entity cap, and
+a local data-rule adapter. Collision events enter a bounded local event queue;
+selected rule effects mutate the actual Rapier bodies or world gravity and can
+create/destroy bodies. The browser arena is intentionally distinct from the
+backend's deterministic event-trace engine: the backend remains authoritative
+for API simulations, compiler discovery, and replay, while Rapier supplies the
+continuous tactile playground. The UI never claims that a live Rapier frame is
+the same bit-for-bit result as the server trace.
+
+Run the same-origin production app with:
+
+```sh
+npm run api
+# open http://localhost:3000/
+```
+
+For development, run the API and Vite in two terminals. Vite proxies `/api` to
+the API and serves the browser with fast source updates:
+
+```sh
+npm run api
+npm run dev
+# open http://localhost:5173/
+```
+
+There is no browser installed in the build environment, so automated checks
+cover the request builders, trace cursor, real Rapier WASM stepping, static
+HTML/API serving, and all production API handlers. A manual browser smoke check
+should click Play, bump/reset/step bodies, select rules, run Sandbox, run the
+Compiler, and paste the generated result into Replay.
 
 ## Surprise Compiler search
 
@@ -334,4 +385,6 @@ docker run --rm -i --entrypoint node rule-riot:local dist/src/cli.js list-rules
 - The HTTP API is stateless and synchronous at the request boundary. Search
   computation runs in a worker with conservative limits; larger experiments
   need a persistent job architecture that is not implemented here.
-- The frontend is intentionally not part of the backend package yet.
+- The frontend is a deliberately compact vertical slice rather than a full
+  content-heavy game: two campaign challenges, one sandbox world, one
+  objective, and one shared replay inspector are implemented.
