@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "engineVersion": "0.1.0",
+  "seed": "rule-riot-example-v1",
+  "initialState": {
+    "tick": 0,
+    "gravity": 1,
+    "ambientHeat": 0,
+    "nextEntityNumber": 3,
+    "entities": {
+      "alpha": {
+        "id": "alpha",
+        "kind": "core",
+        "x": 0,
+        "y": 0,
+        "vx": 0,
+        "vy": 0,
+        "health": 100,
+        "heat": 0,
+        "alive": true
+      },
+      "beta": {
+        "id": "beta",
+        "kind": "core",
+        "x": 0,
+        "y": 0,
+        "vx": 0,
+        "vy": 0,
+        "health": 100,
+        "heat": 0,
+        "alive": true
+      }
+    }
+  },
+  "availableRules": [
+    {
+      "id": "collision-damage",
+      "name": "Collision damages target",
+      "trigger": { "eventType": "collision" },
+      "effects": [{ "type": "damage", "target": "target", "amount": 5 }]
+    },
+    {
+      "id": "damage-spawns",
+      "name": "Damage creates a fragment",
+      "trigger": { "eventType": "damage", "conditions": { "minAmount": 5 } },
+      "effects": [{ "type": "create-entity", "kind": "fragment", "health": 20, "heat": 0, "xOffset": 0, "yOffset": 0, "vx": 0, "vy": 0 }]
+    },
+    {
+      "id": "heat-reverses-gravity",
+      "name": "Heat reverses gravity",
+      "trigger": { "eventType": "heat-changed", "conditions": { "minAmount": 5 } },
+      "effects": [{ "type": "change-gravity", "amount": -3 }]
+    },
+    {
+      "id": "spawn-heats",
+      "name": "A new fragment releases heat",
+      "trigger": { "eventType": "entity-created" },
+      "effects": [{ "type": "change-heat", "target": "entity", "amount": 5 }]
+    }
+  ],
+  "constraints": { "minRules": 1, "maxRules": 4 },
+  "objective": {
+    "type": "causal-chain",
+    "minCausalEvents": 5,
+    "minEntitiesCreated": 1,
+    "gravity": { "comparison": "lte", "value": -1 },
+    "requireCompleted": true
+  },
+  "budget": { "maxCandidates": 20, "maxEvaluations": 20 },
+  "simulationConfig": { "maxSteps": 10, "maxEvents": 100, "maxEntities": 10 }
+}

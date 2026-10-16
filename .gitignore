@@ -6,3 +6,5 @@ coverage/
 !.env.example
 *.log
 .DS_Store
+discovery-result.json
+examples/discovery-result.json

@@ -5,10 +5,20 @@ combinations of validated state-transition rules and records the causal events
 behind interesting outcomes. This repository contains the backend only; no
 frontend is included.
 
+## Product overview
+
+Rule Riot's backend lets a caller submit a small data-only rule catalogue and
+an initial world, then either run that exact rule set or search combinations of
+the catalogue. A discovery is valid only when the production simulation
+actually reaches the objective; the search does not generate a prewritten
+story or event trace.
+
+The repository is backend-only. It intentionally has no frontend, persistent
+database, cloud service, blockchain, paid API, or HTTP server.
+
 ## Architecture
 
-The backend is a small TypeScript/Node.js application with these planned
-boundaries:
+The backend is a small TypeScript/Node.js application with these boundaries:
 
 - `src/domain/` — typed world state, events, rules, canonical serialization,
   and result contracts.
@@ -122,7 +132,7 @@ HTTP API in this backend: adding a server would not provide value for the
 current reproducible CLI workflow and would add lifecycle state that the
 product does not yet require.
 
-## Development commands
+## Setup and development commands
 
 Use Node.js `22.12.0` (the version is pinned in `.nvmrc`). Install the locked
 dependencies with:
@@ -140,6 +150,110 @@ npm run typecheck
 npm run lint   # strict TypeScript validation until a separate linter is needed
 ```
 
-At this phase the repository has no CLI or HTTP API yet. The discovery and
-replay operations are available as library APIs and will be exposed by the CLI
-only when that real boundary is implemented.
+`make test` is the single documented offline test command after dependencies
+have been installed. It runs the same `npm test` target. `npm ci` is the only
+dependency installation step; `package-lock.json` pins the exact dependency
+artifacts.
+
+## Reproducible discovery
+
+The checked-in example is a deliberately small bounded problem, not a claimed
+benchmark or universal search result. It has four available rules and searches
+all 1-, 2-, 3-, and 4-rule combinations (15 candidates). Run the actual
+compiler and save its complete result with:
+
+```sh
+npm ci
+npm run --silent discovery | tee discovery-result.json
+node dist/src/cli.js inspect --input discovery-result.json
+node dist/src/cli.js verify --input discovery-result.json
+```
+
+The command exits nonzero for invalid input, no-match results, or replay
+mismatches. `discovery-result.json` is a local generated artifact and is
+ignored by the repository.
+For a stable named output under the example directory, use:
+
+```sh
+npm run --silent discovery > examples/discovery-result.json
+node dist/src/cli.js verify --input examples/discovery-result.json
+```
+
+The result contains the full `SearchRequest`, selected rule IDs, objective
+score, search statistics, and the exact simulation trace required for replay.
+
+## Rule semantics and request shapes
+
+Rules are JSON objects with a lowercase kebab-case `id`, a display `name`, a
+`trigger`, and one to eight `effects`. Trigger event types are `collision`,
+`damage`, `entity-created`, `heat-changed`, `gravity-changed`,
+`entity-destroyed`, and `tick`. Conditions can constrain entity kinds, amount,
+gravity, and heat. Effects are `damage`, `create-entity`, `change-heat`,
+`change-gravity`, and `destroy-entity`; every numeric property is finite and
+every creation effect carries explicit health, heat, position offsets, and
+velocity.
+
+`SimulationRequest` contains `schemaVersion`, `engineVersion`, `seed`,
+`initialState`, `rules`, and `config`. `SearchRequest` contains the same world
+inputs as well as `availableRules`, rule-count constraints, the causal-chain
+objective, candidate/evaluation budgets, and simulation limits. The CLI accepts
+these objects as JSON; the TypeScript exports in `src/index.ts` are the library
+boundary for embedding the engine.
+
+## Determinism, limits, and statistics
+
+Determinism is defined over the validated JSON request and engine version:
+logical ticks replace wall-clock time; entity IDs are sequential; event order
+is logical step, event priority, then sequence; and rule/entity ordering uses a
+locale-independent code-point comparator. The seed is recorded even though
+the current rule vocabulary has no random operation. The engine does not claim
+cross-version compatibility: a trace names the exact engine version and replay
+rejects unsupported versions.
+
+`maxSteps`, `maxEvents`, and `maxEntities` are logical safety limits. A
+simulation reports `completed` only after its event queue is exhausted. A limit
+termination is `limit-exhausted` with a `termination.reason` of `max-steps`,
+`max-events`, or `max-entities`. Search statistics mean:
+
+- `candidatesGenerated`: unique combinations admitted to the search budget;
+- `candidatesEvaluated`: those combinations actually sent to the simulation;
+- `invalidCandidates`: candidates rejected by the production simulation input
+  boundary (normally zero after catalogue validation);
+- `simulationsLimitTerminated`: evaluated simulations that hit a safety limit;
+- `duplicateCandidatesSkipped`: combinations skipped because their canonical
+  ID list was already seen; and
+- `searchTermination`: whether the finite candidate space completed or the
+  search budget ended first.
+
+The search is exhaustive only within its explicitly bounded combination space.
+It does not claim global optimality beyond that space and does not use a wall
+clock timeout as a semantic result.
+
+## Docker
+
+The Dockerfile pins Node.js `22.12.0`, installs from the lockfile, builds the
+TypeScript output in a builder stage, and copies only production dependencies
+and compiled output into the runtime stage. Build and run it with:
+
+```sh
+make docker-build
+docker run --rm -i rule-riot:local list-rules
+docker run --rm -i -v "$PWD/examples:/examples:ro" rule-riot:local search --input /examples/search-request.json
+```
+
+## Known limitations and future work
+
+- The world model is intentionally small: there is no continuous physics,
+  spatial index, networking, persistence layer, or frontend.
+- The event vocabulary currently has no random effect, so changing `seed` does
+  not change outcomes. It is retained as a versioned reproducibility input for
+  future seeded operations.
+- Search is exhaustive and suitable for small catalogues only. Larger spaces
+  need a separately specified deterministic strategy such as beam search or
+  branch-and-bound; no such strategy is implied by this implementation.
+- Replay verification reruns and compares deterministic data. It is not a
+  cryptographic signature, tamper-proof log, or independent implementation of
+  the physics.
+- The HTTP API and frontend are intentionally unfinished because the current
+  CLI and library boundary provide the required demonstrable backend without
+  introducing asynchronous lifecycle or deployment state.
