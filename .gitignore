@@ -8,3 +8,4 @@ coverage/
 .DS_Store
 discovery-result.json
 examples/discovery-result.json
+.vercel
