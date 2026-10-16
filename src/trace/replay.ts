@@ -15,7 +15,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function mismatch(path: string, expected: unknown, actual: unknown, message: string): ReplayResult {
-  return { status: "mismatch", message, path, expected: canonicalStringify(expected), actual: canonicalStringify(actual) };
+  const printable = (value: unknown): string => {
+    try {
+      return canonicalStringify(value);
+    } catch {
+      return String(value);
+    }
+  };
+  return { status: "mismatch", message, path, expected: printable(expected), actual: printable(actual) };
 }
 
 /** Re-run a trace's recorded request and compare every deterministic result field. */
@@ -27,6 +34,7 @@ export function verifyReplay(input: unknown): ReplayResult {
   if (input.seed !== input.request.seed) return mismatch("seed", input.request.seed, input.seed, "Trace seed does not match the recorded simulation request");
   if (input.engineVersion !== input.request.engineVersion) return mismatch("engineVersion", input.request.engineVersion, input.engineVersion, "Trace engine version does not match its request");
   if (!Array.isArray(input.entries)) return { status: "invalid-trace", errors: [{ path: "trace.entries", message: "must be an array" }] };
+  if (!isRecord(input.finalState)) return { status: "invalid-trace", errors: [{ path: "trace.finalState", message: "must be an object" }] };
 
   const requestValidation = validateSimulationRequest(input.request);
   if (!requestValidation.ok || requestValidation.value === undefined) return { status: "invalid-trace", errors: requestValidation.errors };

@@ -69,4 +69,8 @@ test("rejects unsupported engine versions and malformed traces", () => {
   const malformed = copy(trace()) as unknown as Record<string, unknown>;
   malformed.entries = "corrupt";
   assert.equal(verifyReplay(malformed).status, "invalid-trace");
+
+  const missingFinalState = copy(trace()) as unknown as Record<string, unknown>;
+  delete missingFinalState.finalState;
+  assert.equal(verifyReplay(missingFinalState).status, "invalid-trace");
 });
