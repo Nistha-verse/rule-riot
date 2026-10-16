@@ -1,0 +1,21 @@
+{
+  "name": "rule-riot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic rule-composition simulation and discovery engine",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test \"dist/test/*.test.js\"",
+    "start": "node dist/src/cli.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
