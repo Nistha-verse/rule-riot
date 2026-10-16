@@ -6,3 +6,5 @@ export { cloneWorldState, runSimulation } from "./simulation/engine.js";
 export { runSearch, scoreObjective } from "./search/compiler.js";
 export { validateSearchRequest } from "./search/validate.js";
 export * from "./search/types.js";
+export { verifyReplay } from "./trace/replay.js";
+export type { ReplayResult } from "./trace/replay.js";

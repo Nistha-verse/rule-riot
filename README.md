@@ -54,8 +54,8 @@ completed simulation. The request seed is preserved for reproducibility, but
 the current vocabulary does not use randomness.
 
 Every successful or limit-terminated run already contains state-before/state-
-after snapshots and scheduled-event details in its structured trace. Search,
-replay, and the CLI are delivered in later phases.
+after snapshots and scheduled-event details in its structured trace. Search and
+replay are implemented as library APIs; the CLI is delivered in a later phase.
 
 ## Surprise Compiler search
 
@@ -83,6 +83,19 @@ objective. Ties are resolved by the canonical rule-ID list. A successful
 discovery includes the selected rule IDs, objective measurements, the complete
 simulation trace, and the full search request needed to reproduce it.
 
+## Trace and replay verification
+
+Each simulation trace records the engine and trace schema versions, seed, full
+validated request, ordered event entries, state snapshots before and after each
+event, matched rules, effects, newly scheduled events, terminal reason, and
+metrics. `verifyReplay` validates the recorded request, runs it again through
+the production engine, and compares canonical final state, termination,
+metrics, and every trace entry. It returns an explicit mismatch with the
+compared field rather than correcting the record. This is deterministic replay
+verification, not cryptographic integrity or tamper-proof storage; a separately
+recomputed self-consistent record cannot be distinguished from an authentic one
+without an external trust mechanism.
+
 ## Development commands
 
 Use Node.js `22.12.0` (the version is pinned in `.nvmrc`). Install the locked
@@ -101,5 +114,6 @@ npm run typecheck
 npm run lint   # strict TypeScript validation until a separate linter is needed
 ```
 
-At this phase the repository has no API or discovery command yet. Those are
-added only when their real implementations are available.
+At this phase the repository has no CLI or HTTP API yet. The discovery and
+replay operations are available as library APIs and will be exposed by the CLI
+only when that real boundary is implemented.
