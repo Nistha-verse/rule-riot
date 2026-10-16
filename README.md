@@ -57,6 +57,32 @@ Every successful or limit-terminated run already contains state-before/state-
 after snapshots and scheduled-event details in its structured trace. Search,
 replay, and the CLI are delivered in later phases.
 
+## Surprise Compiler search
+
+`runSearch` exhaustively enumerates each rule combination between
+`constraints.minRules` and `constraints.maxRules`, using stable code-point rule
+ID ordering. A candidate is evaluated once through `runSimulation`; no search
+path has a separate or simulated execution model. The search stops at either
+the end of the finite combination space or its `maxCandidates` /
+`maxEvaluations` budgets and reports which occurred.
+
+The initial objective is `causal-chain`. Its score is:
+
+```text
+longest causal chain × 1,000,000
+  + entities created × 1,000
+  + 1 when the optional gravity condition is satisfied
+```
+
+The candidate qualifies only when the longest chain reaches
+`minCausalEvents`, the simulation creates at least `minEntitiesCreated`, the
+optional gravity predicate passes, and (when requested) the simulation ends
+normally rather than at a safety limit. A chain follows `parentEventId` links
+among processed trace entries, so unrelated event volume does not inflate the
+objective. Ties are resolved by the canonical rule-ID list. A successful
+discovery includes the selected rule IDs, objective measurements, the complete
+simulation trace, and the full search request needed to reproduce it.
+
 ## Development commands
 
 Use Node.js `22.12.0` (the version is pinned in `.nvmrc`). Install the locked
