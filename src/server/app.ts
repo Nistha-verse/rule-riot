@@ -1,8 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import fastifyStatic from "@fastify/static";
-import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, promises as fs } from "node:fs";
+import { extname, join, resolve } from "node:path";
 import { ENGINE_VERSION } from "../version.js";
 import {
   REQUEST_SCHEMA_VERSION,
@@ -93,9 +91,23 @@ export function createApiApp(dependencies: Partial<ApiDependencies> = {}, option
     requestIdHeader: "x-request-id",
   });
 
-  const staticRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../client");
+  const staticRoot = resolve(process.cwd(), "dist/client");
   if (existsSync(staticRoot)) {
-    app.register(fastifyStatic, { root: staticRoot, prefix: "/", decorateReply: false });
+    const contentTypes: Record<string, string> = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".map": "application/json; charset=utf-8", ".html": "text/html; charset=utf-8" };
+    app.get("/", async (_request, reply) => {
+      const index = await fs.readFile(join(staticRoot, "index.html"));
+      return reply.type("text/html; charset=utf-8").send(index);
+    });
+    app.get("/assets/*", async (request, reply) => {
+      const wildcard = (request.params as { "*"?: string })["*"];
+      if (wildcard === undefined || wildcard.includes("..") || wildcard.includes("\\")) return reply.code(404).send();
+      try {
+        const file = await fs.readFile(join(staticRoot, "assets", wildcard));
+        return reply.type(contentTypes[extname(wildcard)] ?? "application/octet-stream").send(file);
+      } catch {
+        return reply.code(404).send();
+      }
+    });
   }
 
   app.addHook("onRequest", async (request, reply) => {
