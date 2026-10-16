@@ -6,9 +6,8 @@ import { validateRuleSet } from "./rules/validate.js";
 import { runSearch } from "./search/compiler.js";
 import { verifyReplay } from "./trace/replay.js";
 import { runSimulation } from "./simulation/engine.js";
-
-const SUPPORTED_EVENTS = ["collision", "damage", "entity-created", "heat-changed", "gravity-changed", "entity-destroyed", "tick"] as const;
-const SUPPORTED_EFFECTS = ["damage", "create-entity", "change-heat", "change-gravity", "destroy-entity"] as const;
+import type { ValidationIssue } from "./domain/types.js";
+import { SUPPORTED_EFFECT_TYPES, SUPPORTED_EVENT_TYPES } from "./rules/vocabulary.js";
 
 class UsageError extends Error {}
 
@@ -35,8 +34,12 @@ async function readInput(args: string[]): Promise<unknown> {
   let text: string;
   if (index >= 0) {
     const file = args[index + 1];
-    if (file === undefined || file.startsWith("--")) throw new UsageError("--input requires a file path");
-    text = await readFile(file, "utf8");
+    if (file === undefined || file.startsWith("--")) throw new UsageError(`${args[index] ?? "--input"} requires a file path`);
+    try {
+      text = await readFile(file, "utf8");
+    } catch {
+      throw new UsageError(`Unable to read input file: ${file}`);
+    }
   } else {
     text = await new Promise<string>((resolve, reject) => {
       let result = "";
@@ -93,14 +96,24 @@ async function execute(command: string, args: string[]): Promise<number> {
     return command === undefined ? 1 : 0;
   }
   if (command === "list-rules") {
-    write({ events: SUPPORTED_EVENTS, effects: SUPPORTED_EFFECTS, rule: { id: "lowercase-kebab-case", trigger: "{eventType, optional conditions}", effects: "one to eight allowlisted data effects" } });
+    write({ events: SUPPORTED_EVENT_TYPES, effects: SUPPORTED_EFFECT_TYPES, rule: { id: "lowercase-kebab-case", trigger: "{eventType, optional conditions}", effects: "one to eight allowlisted data effects" } });
     return 0;
   }
 
   const input = await readInput(args);
   if (command === "validate") {
-    const rules = Array.isArray(input) ? input : isRecord(input) ? input.rules : undefined;
-    const result = validateRuleSet(rules);
+    let result;
+    if (Array.isArray(input)) {
+      result = validateRuleSet(input);
+    } else if (isRecord(input)) {
+      const errors: ValidationIssue[] = Object.keys(input)
+        .filter((key) => key !== "rules")
+        .map((key) => ({ path: `request.${key}`, message: "unknown field" }));
+      const ruleResult = validateRuleSet(input.rules);
+      result = errors.length > 0 ? { ok: false, errors: [...errors, ...ruleResult.errors] } : ruleResult;
+    } else {
+      result = validateRuleSet(undefined);
+    }
     write({ valid: result.ok, errors: result.errors });
     return result.ok ? 0 : 1;
   }

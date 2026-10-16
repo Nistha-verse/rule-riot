@@ -82,3 +82,15 @@ test("runs a real search and returns nonzero for invalid input", () => {
   assert.equal(invalid.status, 1);
   assert.equal(JSON.parse(invalid.stdout).status, "invalid-input");
 });
+
+test("reports file and wrapper validation errors as usage errors", () => {
+  const missing = runCli(["simulate", "--input", "/definitely/missing/rule-riot.json"]);
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /Unable to read input file/);
+
+  const wrapper = runCli(["validate"], { rules: [], unexpected: true });
+  assert.equal(wrapper.status, 1);
+  const output = JSON.parse(wrapper.stdout) as { valid: boolean; errors: Array<{ path: string }> };
+  assert.equal(output.valid, false);
+  assert.ok(output.errors.some((error) => error.path === "request.unexpected"));
+});

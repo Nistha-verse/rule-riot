@@ -18,5 +18,6 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/examples ./examples
 
+USER node
 ENTRYPOINT ["node", "dist/src/cli.js"]
 CMD ["help"]

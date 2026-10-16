@@ -208,19 +208,17 @@ function effectEvent(effect: RuleEffect, event: ScheduledEvent, state: WorldStat
   });
 }
 
-function initialEvents(state: WorldState): Array<{ type: EventType; fields: EventFields }> {
+function scheduleInitialCollisions(state: WorldState, schedule: (step: number, type: EventType, fields?: EventFields) => ScheduledEvent | undefined): void {
   const entities = Object.values(state.entities).filter((entity) => entity.alive).sort((left, right) => compareText(left.id, right.id));
-  const events: Array<{ type: EventType; fields: EventFields }> = [];
   for (let leftIndex = 0; leftIndex < entities.length; leftIndex += 1) {
     const left = entities[leftIndex]!;
     for (let rightIndex = leftIndex + 1; rightIndex < entities.length; rightIndex += 1) {
       const right = entities[rightIndex]!;
       if (left.x === right.x && left.y === right.y) {
-        events.push({ type: "collision", fields: { entityId: left.id, targetEntityId: right.id } });
+        if (schedule(0, "collision", { entityId: left.id, targetEntityId: right.id }) === undefined) return;
       }
     }
   }
-  return events;
 }
 
 function emptyMetrics(): SimulationMetrics {
@@ -266,7 +264,7 @@ export function runSimulation(input: unknown): SimulationResult {
     return event;
   };
 
-  for (const initial of initialEvents(state)) schedule(0, initial.type, initial.fields);
+  scheduleInitialCollisions(state, schedule);
   if (tickRulesExist && termination === undefined) schedule(0, "tick");
 
   while (queue.length > 0 && termination === undefined) {
@@ -276,10 +274,14 @@ export function runSimulation(input: unknown): SimulationResult {
       termination = { reason: "max-steps", message: `The step budget of ${request.config.maxSteps} was reached` };
       break;
     }
-    metrics.eventsProcessed += 1;
-    metrics.stepsProcessed = Math.max(metrics.stepsProcessed, queued.step + 1);
     const before = cloneWorldState(state);
     const applied = applyEvent(queued, state, request.config.maxEntities);
+    if (applied.hitEntityLimit) {
+      termination = { reason: "max-entities", message: `The entity budget of ${request.config.maxEntities} was reached before processing an entity creation` };
+      break;
+    }
+    metrics.eventsProcessed += 1;
+    metrics.stepsProcessed = Math.max(metrics.stepsProcessed, queued.step + 1);
     const matchingRules = sortedRules.filter((rule) => matchesRule(rule, applied.event, state));
     const appliedEffects = matchingRules.flatMap((rule) => rule.effects.map((effect) => ({ ...effect })));
     const generated: ScheduledEvent[] = [];
@@ -324,9 +326,6 @@ export function runSimulation(input: unknown): SimulationResult {
       stateAfter: after,
     });
     metrics.entitiesCreated += applied.entitiesCreated;
-    if (applied.hitEntityLimit) {
-      termination = { reason: "max-entities", message: `The entity budget of ${request.config.maxEntities} was reached` };
-    }
   }
 
   if (termination === undefined) {

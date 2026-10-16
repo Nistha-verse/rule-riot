@@ -200,6 +200,14 @@ objective, candidate/evaluation budgets, and simulation limits. The CLI accepts
 these objects as JSON; the TypeScript exports in `src/index.ts` are the library
 boundary for embedding the engine.
 
+All numeric inputs are finite and bounded to an absolute value of at most
+`1_000_000_000`; health and heat values cannot be negative. This prevents
+validated arithmetic from overflowing into non-finite state. Initial collision
+events are scheduled lazily and stop as soon as the event budget is admitted.
+If an entity creation would exceed `maxEntities`, the attempted creation is not
+processed as an `entity-created` event and cannot trigger rules or inflate a
+causal objective; the run terminates with `max-entities` instead.
+
 ## Determinism, limits, and statistics
 
 Determinism is defined over the validated JSON request and engine version:

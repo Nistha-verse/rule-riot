@@ -140,3 +140,53 @@ test("never overwrites an existing generated-style entity id", () => {
   assert.equal(result.finalState.entities["entity-3"]?.health, 2);
   assert.ok(result.finalState.entities["entity-4"]);
 });
+
+test("bounds initial collision scheduling by the event budget", () => {
+  const state = initialState();
+  state.entities.gamma = { id: "gamma", kind: "core", x: 0, y: 0, vx: 0, vy: 0, health: 100, heat: 0, alive: true };
+  const result = runSimulation({ ...request([], { maxEvents: 1 }), initialState: state });
+  assert.equal(result.status, "limit-exhausted");
+  if (result.status !== "limit-exhausted") return;
+  assert.equal(result.termination.reason, "max-events");
+  assert.equal(result.metrics.eventsScheduled, 1);
+  assert.equal(result.metrics.eventsProcessed, 1);
+});
+
+test("rejects unsafe numeric ranges and invalid generated heat", () => {
+  const unsafe = runSimulation(request([{
+    id: "unsafe-number",
+    name: "Unsafe number",
+    trigger: { eventType: "collision" },
+    effects: [{ type: "change-gravity", amount: Number.MAX_VALUE }],
+  }]));
+  assert.equal(unsafe.status, "invalid-input");
+
+  const negativeHeat = runSimulation(request([{
+    id: "negative-created-heat",
+    name: "Negative heat",
+    trigger: { eventType: "collision" },
+    effects: [{ type: "create-entity", kind: "fragment", health: 1, heat: -1, xOffset: 0, yOffset: 0, vx: 0, vy: 0 }],
+  }]));
+  assert.equal(negativeHeat.status, "invalid-input");
+});
+
+test("does not process or score an entity creation that hits the entity limit", () => {
+  const result = runSimulation({
+    ...request([
+      { id: "tick-spawns", name: "Spawn", trigger: { eventType: "tick" }, effects: [{ type: "create-entity", kind: "fragment", health: 1, heat: 0, xOffset: 0, yOffset: 0, vx: 0, vy: 0 }] },
+      { id: "failed-create-changes-gravity", name: "Failed create", trigger: { eventType: "entity-created" }, effects: [{ type: "change-gravity", amount: 5 }] },
+    ], { maxSteps: 2, maxEntities: 1 }),
+    initialState: {
+      tick: 0,
+      gravity: 0,
+      ambientHeat: 0,
+      nextEntityNumber: 1,
+      entities: { core: { id: "core", kind: "core", x: 0, y: 0, vx: 0, vy: 0, health: 10, heat: 0, alive: true } },
+    },
+  });
+  assert.equal(result.status, "limit-exhausted");
+  if (result.status !== "limit-exhausted") return;
+  assert.equal(result.termination.reason, "max-entities");
+  assert.equal(result.finalState.gravity, 0);
+  assert.equal(result.trace.entries.length, 1);
+});
