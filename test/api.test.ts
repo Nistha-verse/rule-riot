@@ -141,7 +141,9 @@ test("returns consistent not-found and replay mismatch responses", async () => {
   altered.finalState.gravity += 1;
   const mismatch = await app.inject({ method: "POST", url: "/api/v1/verify", headers: { "content-type": "application/json" }, payload: altered });
   assert.equal(mismatch.statusCode, 409);
-  assert.equal((json(mismatch) as { status: string }).status, "mismatch");
+  const mismatchBody = json(mismatch) as { error: { code: string; issues: Array<{ path: string }> } };
+  assert.equal(mismatchBody.error.code, "replay-mismatch");
+  assert.equal(mismatchBody.error.issues[0]!.path, "finalState");
 });
 
 test("does not leak unexpected handler failures", async () => {
@@ -161,4 +163,14 @@ test("supports real server startup and graceful shutdown", async () => {
   const address = server.server.address();
   assert.ok(address && typeof address === "object");
   await server.close();
+});
+
+test("supports an explicitly allowed development origin and preflight", async () => {
+  const corsApp = createApiApp({}, { allowedOrigin: "http://localhost:5173" });
+  const preflight = await corsApp.inject({ method: "OPTIONS", url: "/api/v1/search", headers: { origin: "http://localhost:5173", "access-control-request-method": "POST" } });
+  assert.equal(preflight.statusCode, 204);
+  assert.equal(preflight.headers["access-control-allow-origin"], "http://localhost:5173");
+  const denied = await corsApp.inject({ method: "OPTIONS", url: "/api/v1/search", headers: { origin: "http://evil.test", "access-control-request-method": "POST" } });
+  assert.equal(denied.statusCode, 404);
+  await corsApp.close();
 });

@@ -172,13 +172,16 @@ are sanitized `500` responses. Error bodies have this shape:
 ```
 
 The HTTP body limit is `1,048,576` bytes. Interactive HTTP limits are lower
-than the library's local limits: at most 400 initial/simulation entities, 20,000
-simulation steps, 100,000 simulation events, 16 search rules, 500 candidates,
-500 evaluations, 5,000 search steps, 50,000 search events, 200 search entities,
-and 5,000 trace entries for verification. The exact values are returned by
+than the library's local limits: at most 64 initial/simulation entities, 2,000
+simulation steps, 1,000 simulation events, 12 search rules, 100 candidates,
+100 evaluations, 500 search steps, 1,000 search events, 32 search entities,
+and 1,000 trace entries for verification. Responses are capped at 8 MiB and
+search runs inside a worker with a 3-second execution limit. The exact values are returned by
 `/api/v1/rules` and `/api/v1/docs`. These are protective synchronous-request
 limits, not a claim that arbitrarily large searches are safe to run in a web
-server. A future job/worker architecture would be required for larger work.
+server. Searches that exceed the worker limit are stopped and return an honest
+`503 search-timeout`; a future persistent job architecture would be required
+for larger work.
 
 Example requests:
 
@@ -309,8 +312,10 @@ and compiled output into the runtime stage. Build and run it with:
 
 ```sh
 make docker-build
-docker run --rm -i rule-riot:local list-rules
-docker run --rm -i -v "$PWD/examples:/examples:ro" rule-riot:local search --input /examples/search-request.json
+docker run --rm -i -p 3000:3000 rule-riot:local
+# The image starts the API; use curl http://localhost:3000/api/v1/health.
+# To run the CLI explicitly:
+docker run --rm -i --entrypoint node rule-riot:local dist/src/cli.js list-rules
 ```
 
 ## Known limitations and future work
@@ -326,6 +331,7 @@ docker run --rm -i -v "$PWD/examples:/examples:ro" rule-riot:local search --inpu
 - Replay verification reruns and compares deterministic data. It is not a
   cryptographic signature, tamper-proof log, or independent implementation of
   the physics.
-- The HTTP API and frontend are intentionally unfinished because the current
-  CLI and library boundary provide the required demonstrable backend without
-  introducing asynchronous lifecycle or deployment state.
+- The HTTP API is stateless and synchronous at the request boundary. Search
+  computation runs in a worker with conservative limits; larger experiments
+  need a persistent job architecture that is not implemented here.
+- The frontend is intentionally not part of the backend package yet.

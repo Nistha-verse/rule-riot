@@ -1,6 +1,5 @@
 import { TRACE_SCHEMA_VERSION, REQUEST_SCHEMA_VERSION, type SimulationRequest, type ValidationIssue } from "../domain/types.js";
 import { validateRuleSet } from "../rules/validate.js";
-import { validateSearchRequest } from "../search/validate.js";
 import type { SearchRequest } from "../search/types.js";
 
 export const API_VERSION = "v1" as const;
@@ -8,17 +7,19 @@ export const API_BODY_LIMIT_BYTES = 1_048_576;
 
 /** Operational limits for untrusted HTTP requests. The library limits remain broader for local tooling. */
 export const API_LIMITS = {
-  maxInitialEntities: 400,
-  maxSimulationSteps: 20_000,
-  maxSimulationEvents: 100_000,
-  maxSimulationEntities: 400,
-  maxSearchRules: 16,
-  maxSearchCandidates: 500,
-  maxSearchEvaluations: 500,
-  maxSearchSimulationSteps: 5_000,
-  maxSearchSimulationEvents: 50_000,
-  maxSearchSimulationEntities: 200,
-  maxTraceEntries: 5_000,
+  maxInitialEntities: 64,
+  maxSimulationSteps: 2_000,
+  maxSimulationEvents: 1_000,
+  maxSimulationEntities: 64,
+  maxSearchRules: 12,
+  maxSearchCandidates: 100,
+  maxSearchEvaluations: 100,
+  maxSearchSimulationSteps: 500,
+  maxSearchSimulationEvents: 1_000,
+  maxSearchSimulationEntities: 32,
+  maxTraceEntries: 1_000,
+  maxResponseBytes: 8 * 1024 * 1024,
+  searchTimeoutMs: 3_000,
 } as const;
 
 export interface ApiErrorBody {
@@ -65,6 +66,7 @@ export function apiLimitsForSimulation(request: SimulationRequest): ValidationIs
   if (initialEntityCount > API_LIMITS.maxInitialEntities) issues.push(issue("request.initialState.entities", `must contain at most ${API_LIMITS.maxInitialEntities} entities for HTTP execution`));
   if (request.config.maxSteps > API_LIMITS.maxSimulationSteps) issues.push(issue("request.config.maxSteps", `must be at most ${API_LIMITS.maxSimulationSteps} for HTTP execution`));
   if (request.config.maxEvents > API_LIMITS.maxSimulationEvents) issues.push(issue("request.config.maxEvents", `must be at most ${API_LIMITS.maxSimulationEvents} for HTTP execution`));
+  if (request.config.maxEvents > API_LIMITS.maxTraceEntries) issues.push(issue("request.config.maxEvents", `must be at most ${API_LIMITS.maxTraceEntries} so the trace remains bounded`));
   if (request.config.maxEntities > API_LIMITS.maxSimulationEntities) issues.push(issue("request.config.maxEntities", `must be at most ${API_LIMITS.maxSimulationEntities} for HTTP execution`));
   return issues;
 }
@@ -84,6 +86,7 @@ export function apiLimitsForSearch(request: SearchRequest): ValidationIssue[] {
   if (request.budget.maxEvaluations > API_LIMITS.maxSearchEvaluations) issues.push(issue("request.budget.maxEvaluations", `must be at most ${API_LIMITS.maxSearchEvaluations} for HTTP execution`));
   if (request.simulationConfig.maxSteps > API_LIMITS.maxSearchSimulationSteps) issues.push(issue("request.simulationConfig.maxSteps", `must be at most ${API_LIMITS.maxSearchSimulationSteps} for HTTP execution`));
   if (request.simulationConfig.maxEvents > API_LIMITS.maxSearchSimulationEvents) issues.push(issue("request.simulationConfig.maxEvents", `must be at most ${API_LIMITS.maxSearchSimulationEvents} for HTTP execution`));
+  if (request.simulationConfig.maxEvents > API_LIMITS.maxTraceEntries) issues.push(issue("request.simulationConfig.maxEvents", `must be at most ${API_LIMITS.maxTraceEntries} so the trace remains bounded`));
   if (request.simulationConfig.maxEntities > API_LIMITS.maxSearchSimulationEntities) issues.push(issue("request.simulationConfig.maxEntities", `must be at most ${API_LIMITS.maxSearchSimulationEntities} for HTTP execution`));
   if (request.objective.gravity !== undefined && Math.abs(request.objective.gravity.value) > 1_000_000_000) issues.push(issue("request.objective.gravity.value", "must have an absolute value of at most 1000000000 for HTTP execution"));
   return issues;

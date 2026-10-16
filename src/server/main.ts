@@ -1,9 +1,10 @@
 import { createApiApp } from "./app.js";
 
-const port = Number.parseInt(process.env.PORT ?? "3000", 10);
+const portText = process.env.PORT ?? "3000";
+const port = Number(portText);
 const host = process.env.HOST ?? "0.0.0.0";
 
-if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+if (!/^\d+$/.test(portText) || !Number.isInteger(port) || port < 1 || port > 65_535) {
   throw new Error("PORT must be an integer between 1 and 65535");
 }
 

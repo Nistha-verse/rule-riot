@@ -19,5 +19,4 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/examples ./examples
 
 USER node
-ENTRYPOINT ["node", "dist/src/cli.js"]
-CMD ["help"]
+CMD ["node", "dist/src/server/main.js"]

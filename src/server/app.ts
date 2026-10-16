@@ -7,10 +7,10 @@ import {
 } from "../domain/types.js";
 import { validateRuleSet, validateSimulationRequest } from "../rules/validate.js";
 import { SUPPORTED_EFFECT_TARGETS, SUPPORTED_EFFECT_TYPES, SUPPORTED_ENTITY_KINDS, SUPPORTED_EVENT_TYPES } from "../rules/vocabulary.js";
-import { runSearch } from "../search/compiler.js";
 import { validateSearchRequest } from "../search/validate.js";
 import { runSimulation } from "../simulation/engine.js";
 import { verifyReplay } from "../trace/replay.js";
+import type { SearchResult } from "../search/types.js";
 import {
   API_BODY_LIMIT_BYTES,
   API_LIMITS,
@@ -22,14 +22,19 @@ import {
   traceFromApi,
   validateApiRules,
 } from "./contracts.js";
+import { runSearchInWorker, SearchExecutionTimeout } from "./search-runner.js";
 
 export interface ApiDependencies {
   runSimulation: typeof runSimulation;
-  runSearch: typeof runSearch;
+  runSearch: (input: unknown) => SearchResult | Promise<SearchResult>;
   verifyReplay: typeof verifyReplay;
 }
 
-const productionDependencies: ApiDependencies = { runSimulation, runSearch, verifyReplay };
+const productionDependencies: ApiDependencies = { runSimulation, runSearch: runSearchInWorker, verifyReplay };
+
+export interface ApiOptions {
+  allowedOrigin?: string;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -43,6 +48,15 @@ function sendError(reply: FastifyReply, statusCode: number, code: string, messag
 
 function sendValidation(reply: FastifyReply, message: string, issues: ValidationIssue[]): void {
   sendError(reply, 422, "invalid-input", message, issues);
+}
+
+function sendBoundedResult(reply: FastifyReply, value: unknown): void {
+  const serialized = JSON.stringify(value);
+  if (Buffer.byteLength(serialized, "utf8") > API_LIMITS.maxResponseBytes) {
+    sendError(reply, 422, "trace-too-large", `The generated response exceeds the ${API_LIMITS.maxResponseBytes}-byte HTTP response limit`);
+    return;
+  }
+  void reply.code(200).send(value);
 }
 
 function body(request: FastifyRequest): unknown {
@@ -67,7 +81,7 @@ function requestId(request: FastifyRequest): string {
   return request.id;
 }
 
-export function createApiApp(dependencies: Partial<ApiDependencies> = {}): FastifyInstance {
+export function createApiApp(dependencies: Partial<ApiDependencies> = {}, options: ApiOptions = {}): FastifyInstance {
   const api = { ...productionDependencies, ...dependencies };
   const app = Fastify({
     bodyLimit: API_BODY_LIMIT_BYTES,
@@ -76,6 +90,18 @@ export function createApiApp(dependencies: Partial<ApiDependencies> = {}): Fasti
   });
 
   app.addHook("onRequest", async (request, reply) => {
+    const allowedOrigin = options.allowedOrigin ?? process.env.RULE_RIOT_CORS_ORIGIN;
+    const origin = request.headers.origin;
+    if (origin !== undefined && allowedOrigin !== undefined && origin === allowedOrigin) {
+      reply.header("access-control-allow-origin", allowedOrigin);
+      reply.header("vary", "Origin");
+      reply.header("access-control-allow-headers", "content-type, x-request-id");
+      reply.header("access-control-allow-methods", "GET, POST, OPTIONS");
+      if (request.method === "OPTIONS") {
+        await reply.code(204).send();
+        return;
+      }
+    }
     if (request.method === "POST") {
       const contentType = request.headers["content-type"]?.toLowerCase() ?? "";
       if (!contentType.startsWith("application/json")) {
@@ -124,7 +150,7 @@ export function createApiApp(dependencies: Partial<ApiDependencies> = {}): Fasti
       sendValidation(reply, "Rule validation failed", result.errors);
       return;
     }
-    return reply.code(200).send(result);
+    sendBoundedResult(reply, result);
   });
 
   app.post("/api/v1/simulate", async (request, reply) => {
@@ -143,7 +169,7 @@ export function createApiApp(dependencies: Partial<ApiDependencies> = {}): Fasti
       sendValidation(reply, "Simulation request validation failed", result.errors);
       return;
     }
-    return reply.code(200).send(result);
+    sendBoundedResult(reply, result);
   });
 
   app.post("/api/v1/search", async (request, reply) => {
@@ -157,12 +183,21 @@ export function createApiApp(dependencies: Partial<ApiDependencies> = {}): Fasti
       sendValidation(reply, "Search request exceeds the HTTP execution limits", limitIssues);
       return;
     }
-    const result = api.runSearch(body(request));
+    let result: SearchResult;
+    try {
+      result = await api.runSearch(body(request));
+    } catch (error) {
+      if (error instanceof SearchExecutionTimeout) {
+        sendError(reply, 503, "search-timeout", "The bounded search worker exceeded the HTTP execution limit");
+        return;
+      }
+      throw error;
+    }
     if (result.status === "invalid-input") {
       sendValidation(reply, "Search request validation failed", result.errors);
       return;
     }
-    return reply.code(200).send(result);
+    sendBoundedResult(reply, result);
   });
 
   app.post("/api/v1/verify", async (request, reply) => {
@@ -172,9 +207,24 @@ export function createApiApp(dependencies: Partial<ApiDependencies> = {}): Fasti
       sendValidation(reply, "Trace exceeds the HTTP verification limits", [{ path: "trace.entries", message: `must contain at most ${API_LIMITS.maxTraceEntries} entries for HTTP verification` }]);
       return;
     }
+    if (isRecord(trace) && trace.request !== undefined) {
+      const traceRequest = validateSimulationRequest(trace.request);
+      if (!traceRequest.ok || traceRequest.value === undefined) {
+        sendValidation(reply, "Replay trace is invalid", traceRequest.errors);
+        return;
+      }
+      const limitIssues = apiLimitsForSimulation(traceRequest.value);
+      if (limitIssues.length > 0) {
+        sendValidation(reply, "Replay trace exceeds the HTTP execution limits", limitIssues);
+        return;
+      }
+    }
     const result = api.verifyReplay(trace);
     if (result.status === "verified") return reply.code(200).send(result);
-    if (result.status === "mismatch") return reply.code(409).send(result);
+    if (result.status === "mismatch") {
+      const truncate = (value: string): string => value.length > 8_192 ? `${value.slice(0, 8_192)}…[truncated]` : value;
+      return reply.code(409).send({ error: { code: "replay-mismatch", message: result.message, requestId: reply.request.id, issues: [{ path: result.path, message: `expected ${truncate(result.expected)}; actual ${truncate(result.actual)}` }] } });
+    }
     if (result.status === "unsupported-version") {
       sendError(reply, 422, "unsupported-version", result.message);
       return;

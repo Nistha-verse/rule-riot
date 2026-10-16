@@ -22,4 +22,4 @@ docker-build:
 	docker build -t rule-riot:local .
 
 docker-run:
-	docker run --rm -i rule-riot:local help
+	docker run --rm -i -p 3000:3000 rule-riot:local
