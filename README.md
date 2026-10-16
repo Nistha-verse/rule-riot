@@ -54,8 +54,8 @@ completed simulation. The request seed is preserved for reproducibility, but
 the current vocabulary does not use randomness.
 
 Every successful or limit-terminated run already contains state-before/state-
-after snapshots and scheduled-event details in its structured trace. Search and
-replay are implemented as library APIs; the CLI is delivered in a later phase.
+after snapshots and scheduled-event details in its structured trace. Search,
+replay, and the CLI all use the same production engine APIs.
 
 ## Surprise Compiler search
 
@@ -95,6 +95,32 @@ compared field rather than correcting the record. This is deterministic replay
 verification, not cryptographic integrity or tamper-proof storage; a separately
 recomputed self-consistent record cannot be distinguished from an authentic one
 without an external trust mechanism.
+
+## CLI
+
+The CLI is a thin adapter over the same library functions used by the tests; it
+does not contain a second simulation implementation. Commands read one JSON
+document from stdin by default or from `--input FILE`, and write structured JSON
+to stdout. Diagnostics go to stderr. Exit codes are `0` for a successful
+operation, `1` for invalid input/usage, `2` for an honest no-match, limit, or
+replay mismatch, and `3` for an unexpected internal error.
+
+```sh
+npm run build
+node dist/src/cli.js list-rules
+node dist/src/cli.js validate --input rules.json
+node dist/src/cli.js simulate --input simulation-request.json > simulation-result.json
+node dist/src/cli.js search --input search-request.json > discovery.json
+node dist/src/cli.js inspect --input discovery.json
+node dist/src/cli.js verify --input discovery.json
+```
+
+`validate` accepts either a raw rule array or `{ "rules": [...] }`.
+`simulate` accepts a `SimulationRequest`, `search` accepts a `SearchRequest`,
+and `verify` accepts a `SimulationTrace` or a found search result. There is no
+HTTP API in this backend: adding a server would not provide value for the
+current reproducible CLI workflow and would add lifecycle state that the
+product does not yet require.
 
 ## Development commands
 
