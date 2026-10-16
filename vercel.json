@@ -1,0 +1,21 @@
+{
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "outputDirectory": "dist/client",
+  "framework": null,
+  "functions": {
+    "api/[...path].ts": {
+      "runtime": "nodejs22.x",
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    }
+  ]
+}

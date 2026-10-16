@@ -369,6 +369,29 @@ docker run --rm -i -p 3000:3000 rule-riot:local
 docker run --rm -i --entrypoint node rule-riot:local dist/src/cli.js list-rules
 ```
 
+## Vercel deployment
+
+`vercel.json` configures the Vite output as the browser site and the same
+Fastify app as a Node.js 22 catch-all function under `/api/v1/*`. No secrets or
+environment variables are required for this stateless slice. With the Vercel
+CLI authenticated, create/link a dedicated project named for this repository,
+deploy a preview, and then promote it only when the preview checks pass:
+
+```sh
+vercel link --yes
+vercel deploy
+vercel inspect <preview-url>
+curl <preview-url>/api/v1/health
+curl <preview-url>/
+vercel deploy --prod
+```
+
+The function keeps the API's conservative body, trace, search, and worker
+limits. Vercel is not a claim of support for unbounded searches or long-lived
+jobs. If the account/project is not authorized or the platform rejects the
+catch-all Fastify function, the deployment must remain unclaimed until that
+external configuration is corrected.
+
 ## Known limitations and future work
 
 - The world model is intentionally small: there is no continuous physics,
