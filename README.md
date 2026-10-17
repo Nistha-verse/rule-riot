@@ -392,6 +392,8 @@ jobs. If the account/project is not authorized or the platform rejects the
 catch-all Fastify function, the deployment must remain unclaimed until that
 external configuration is corrected.
 
+Verified production deployment: https://rule-riot.vercel.app
+
 ## Known limitations and future work
 
 - The world model is intentionally small: there is no continuous physics,
