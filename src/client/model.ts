@@ -106,3 +106,7 @@ export const howToPlay = [
   ["3 / Read the evidence", "The Sandbox sends the same selected rules to the deterministic backend. Its trace explains what happened."],
   ["4 / Find the surprise", "The Compiler evaluates bounded combinations through the production engine. No-match is an honest result."],
 ];
+
+export function isCampaignLevelUnlocked(index: number, completedIds: readonly string[]): boolean {
+  return index === 0 || completedIds.includes(campaignChallenges[index - 1]?.id ?? "");
+}

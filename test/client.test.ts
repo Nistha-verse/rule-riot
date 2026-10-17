@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createSearchRequest, createSimulationRequest, defaultRules } from "../src/client/model.js";
+import { campaignChallenges, createSearchRequest, createSimulationRequest, defaultRules, isCampaignLevelUnlocked } from "../src/client/model.js";
 import { causalChainIds, createTraceCursor, currentTraceEntry, moveTraceCursor } from "../src/client/trace.js";
 import { PhysicsArena } from "../src/client/physics.js";
 import { ApiError, createApiClient } from "../src/client/api.js";
@@ -14,6 +14,12 @@ test("builds browser requests from the same supported rule catalogue", () => {
   assert.equal(search.availableRules.length, defaultRules.length);
   assert.ok(search.constraints.maxRules <= 4);
   assert.equal(search.objective.type, "causal-chain");
+});
+
+test("unlocks campaign levels only after the preceding challenge is recorded", () => {
+  assert.equal(isCampaignLevelUnlocked(0, []), true);
+  assert.equal(isCampaignLevelUnlocked(1, []), false);
+  assert.equal(isCampaignLevelUnlocked(1, [campaignChallenges[0]!.id]), true);
 });
 
 test("moves a trace cursor and follows causal parents", () => {
