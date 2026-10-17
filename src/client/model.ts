@@ -12,7 +12,7 @@ export const defaultRules: RuleDefinition[] = [
   {
     id: "damage-spawns",
     name: "Damage sheds a fragment",
-    trigger: { eventType: "damage", conditions: { minAmount: 5 } },
+    trigger: { eventType: "damage", conditions: { entityKind: "core", minAmount: 5 } },
     effects: [{ type: "create-entity", kind: "fragment", health: 20, heat: 0, xOffset: 0, yOffset: 0, vx: 0.2, vy: -0.2 }],
   },
   {
@@ -98,4 +98,11 @@ export const campaignChallenges = [
     objective: "Discover a five-event causal chain.",
     rules: defaultRules.slice(0, 4),
   },
+];
+
+export const howToPlay = [
+  ["1 / Choose a law", "Rule cards are small, explicit pieces of world logic. Turn them on before you run an experiment."],
+  ["2 / Make an impact", "Use Bump Cores, Step, or let the fixed-step arena play. Bodies, boundaries, and collision events are real Rapier physics."],
+  ["3 / Read the evidence", "The Sandbox sends the same selected rules to the deterministic backend. Its trace explains what happened."],
+  ["4 / Find the surprise", "The Compiler evaluates bounded combinations through the production engine. No-match is an honest result."],
 ];

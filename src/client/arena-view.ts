@@ -18,6 +18,7 @@ export class ArenaView {
   private selectedId: string | null = null;
   private onSelect: ((id: string | null) => void) | undefined;
   private resizeObserver: ResizeObserver | undefined;
+  private readonly updateHandler: (snapshot: ArenaSnapshot) => void;
 
   constructor(private readonly host: HTMLElement, private readonly physics: PhysicsArena) {
     this.canvas = document.createElement("canvas");
@@ -27,10 +28,11 @@ export class ArenaView {
     const context = this.canvas.getContext("2d");
     if (context === null) throw new Error("Canvas 2D context is unavailable");
     this.context = context;
-    physics.addUpdateHandler((snapshot) => {
+    this.updateHandler = (snapshot) => {
       this.snapshot = snapshot;
       this.draw();
-    });
+    };
+    physics.addUpdateHandler(this.updateHandler);
     this.canvas.addEventListener("click", (event) => this.selectAt(event));
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(host);
@@ -42,6 +44,7 @@ export class ArenaView {
   }
 
   destroy(): void {
+    this.physics.removeUpdateHandler(this.updateHandler);
     this.resizeObserver?.disconnect();
     this.canvas.remove();
   }

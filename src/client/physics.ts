@@ -45,7 +45,7 @@ interface BodyMeta {
 
 const FIXED_STEP = 1 / 60;
 const MAX_STEPS_PER_FRAME = 4;
-const MAX_LOCAL_EVENTS = 180;
+const MAX_LOCAL_EVENTS = 72;
 const WORLD_WIDTH = 14;
 const WORLD_HEIGHT = 8;
 
@@ -67,6 +67,7 @@ export class PhysicsArena {
   private ambientHeat = 0;
   private gravity = 1;
   private lastEvent: LocalEvent | null = null;
+  private readonly maxEntities = 16;
 
   constructor(onUpdate?: (snapshot: ArenaSnapshot) => void) {
     if (onUpdate !== undefined) this.updateHandlers.add(onUpdate);
@@ -85,6 +86,10 @@ export class PhysicsArena {
 
   addUpdateHandler(handler: (snapshot: ArenaSnapshot) => void): void {
     this.updateHandlers.add(handler);
+  }
+
+  removeUpdateHandler(handler: (snapshot: ArenaSnapshot) => void): void {
+    this.updateHandlers.delete(handler);
   }
 
   setRules(rules: RuleDefinition[]): void {
@@ -289,7 +294,7 @@ export class PhysicsArena {
   }
 
   private addEntity(id: string, kind: EntityKind, x: number, y: number, vx: number, vy: number, health: number, heat: number): boolean {
-    if (this.world === null || this.entities.size >= 32) return false;
+    if (this.world === null || this.entities.size >= this.maxEntities) return false;
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y).setLinvel(vx, vy).setLinearDamping(0.05));
     const radius = kind === "core" ? 0.48 : kind === "thermal" ? 0.62 : 0.28;
     const collider = this.world.createCollider(RAPIER.ColliderDesc.ball(radius).setRestitution(0.78).setFriction(0.28).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS), body);
