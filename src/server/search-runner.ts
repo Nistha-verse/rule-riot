@@ -1,6 +1,7 @@
 import { Worker } from "node:worker_threads";
 import { API_LIMITS } from "./contracts.js";
 import type { SearchResult } from "../search/types.js";
+import { runSearch } from "../search/compiler.js";
 
 export class SearchExecutionTimeout extends Error {
   constructor() {
@@ -10,6 +11,11 @@ export class SearchExecutionTimeout extends Error {
 }
 
 export function runSearchInWorker(input: unknown): Promise<SearchResult> {
+  // Vercel's bundled Node runtime does not guarantee that an external worker
+  // module is present beside the function bundle. Its HTTP budgets are already
+  // conservative, so use the same production compiler in-process there rather
+  // than turning a valid bounded search into a server error.
+  if (process.env.VERCEL === "1") return Promise.resolve().then(() => runSearch(input));
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./search-worker.js", import.meta.url));
     let settled = false;
