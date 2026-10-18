@@ -1,5 +1,6 @@
 import type { RuleDefinition, SimulationRequest, WorldState } from "../domain/types.js";
 import type { SearchRequest } from "../search/types.js";
+import type { ArenaSnapshot } from "./physics.js";
 import { ENGINE_VERSION } from "../version.js";
 
 export const defaultRules: RuleDefinition[] = [
@@ -99,6 +100,12 @@ export const campaignChallenges = [
     rules: defaultRules.slice(0, 4),
   },
 ];
+
+export function isCampaignChallengeComplete(id: string, snapshot: Pick<ArenaSnapshot, "events" | "gravity">): boolean {
+  if (id === "first-impact") return snapshot.events.some((event) => event.type === "collision");
+  if (id !== "chain-reaction" || snapshot.gravity > -1) return false;
+  return ["collision", "damage", "entity-created", "heat-changed", "gravity-changed"].every((type) => snapshot.events.some((event) => event.type === type));
+}
 
 export const howToPlay = [
   ["1 / Choose a law", "Rule cards are small, explicit pieces of world logic. Turn them on before you run an experiment."],

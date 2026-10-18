@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { campaignChallenges, createSearchRequest, createSimulationRequest, defaultRules, isCampaignLevelUnlocked } from "../src/client/model.js";
+import { campaignChallenges, createSearchRequest, createSimulationRequest, defaultRules, isCampaignChallengeComplete, isCampaignLevelUnlocked } from "../src/client/model.js";
 import { causalChainIds, createTraceCursor, currentTraceEntry, moveTraceCursor } from "../src/client/trace.js";
 import { PhysicsArena } from "../src/client/physics.js";
 import { ApiError, createApiClient } from "../src/client/api.js";
@@ -67,6 +67,22 @@ test("retains the triggering collision when rules append follow-up events", asyn
   const snapshot = arena.snapshot();
   assert.ok(snapshot.events.some((event) => event.type === "collision"));
   assert.ok(snapshot.events.some((event) => event.type === "damage"));
+  arena.dispose();
+});
+
+test("passes every campaign challenge through a real bounded physics session", async () => {
+  const arena = new PhysicsArena();
+  await arena.ready;
+
+  for (const challenge of campaignChallenges) {
+    arena.setRules(challenge.rules);
+    arena.reset();
+    for (let index = 0; index < 120 && !isCampaignChallengeComplete(challenge.id, arena.snapshot()); index += 1) arena.stepOnce();
+    const snapshot = arena.snapshot();
+    assert.equal(isCampaignChallengeComplete(challenge.id, snapshot), true, `${challenge.id} should be a good session`);
+    if (challenge.id === "chain-reaction") assert.ok(snapshot.gravity <= -1);
+  }
+
   arena.dispose();
 });
 

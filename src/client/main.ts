@@ -4,7 +4,7 @@ import type { SearchResult } from "../search/types.js";
 import { ENGINE_VERSION } from "../version.js";
 import { ApiError, createApiClient, type RuleRiotApi } from "./api.js";
 import { ArenaView } from "./arena-view.js";
-import { campaignChallenges, createSearchRequest, createSimulationRequest, defaultRules, howToPlay, isCampaignLevelUnlocked } from "./model.js";
+import { campaignChallenges, createSearchRequest, createSimulationRequest, defaultRules, howToPlay, isCampaignChallengeComplete, isCampaignLevelUnlocked } from "./model.js";
 import { PhysicsArena, type ArenaSnapshot } from "./physics.js";
 import { causalChainIds, createTraceCursor, currentTraceEntry, moveTraceCursor, type TraceCursor } from "./trace.js";
 
@@ -79,8 +79,7 @@ function currentLevelComplete(): void {
 function evaluateLevel(snapshot: ArenaSnapshot): void {
   if (state.route !== "play" || state.gameStatus !== "running") return;
   const level = campaignChallenges[state.levelIndex];
-  if (level?.id === "first-impact" && snapshot.events.some((event) => event.type === "collision")) currentLevelComplete();
-  if (level?.id === "chain-reaction" && snapshot.events.some((event) => event.type === "gravity-changed") && snapshot.gravity <= -1) currentLevelComplete();
+  if (level !== undefined && isCampaignChallengeComplete(level.id, snapshot)) currentLevelComplete();
 }
 
 async function runSimulation(): Promise<void> {
@@ -166,7 +165,7 @@ function bind(): void {
   document.querySelectorAll<HTMLButtonElement>("[data-trace-index]").forEach((button) => button.onclick = () => { state.cursor = { trace: state.cursor.trace, index: Number(button.dataset.traceIndex) }; render(); });
   document.querySelectorAll<HTMLButtonElement>("[data-cursor]").forEach((button) => button.onclick = () => { state.cursor = moveTraceCursor(state.cursor, Number(button.dataset.cursor)); render(); });
   const toggle = document.querySelector<HTMLButtonElement>("#physics-toggle"); toggle?.addEventListener("click", () => { const running = physics.toggle(); toggle.textContent = running ? "Pause" : "Play"; state.gameStatus = running ? "running" : state.gameStatus; });
-  document.querySelector<HTMLButtonElement>("#physics-step")?.addEventListener("click", () => { physics.stepOnce(); state.gameStatus = "running"; render(); });
+  document.querySelector<HTMLButtonElement>("#physics-step")?.addEventListener("click", () => { if (state.gameStatus === "ready") state.gameStatus = "running"; physics.stepOnce(); render(); });
   document.querySelector<HTMLButtonElement>("#physics-reset")?.addEventListener("click", () => { physics.reset(); state.gameStatus = "ready"; render(); });
   document.querySelector<HTMLButtonElement>("#physics-bump")?.addEventListener("click", () => { physics.impulse(); if (state.gameStatus === "ready") state.gameStatus = "running"; });
 }
