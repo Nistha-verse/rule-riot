@@ -86,6 +86,18 @@ test("passes every campaign challenge through a real bounded physics session", a
   arena.dispose();
 });
 
+test("does not pass the chain reaction before the gravity flip", async () => {
+  const arena = new PhysicsArena();
+  await arena.ready;
+  arena.setRules(campaignChallenges[1]!.rules.slice(0, 3));
+  arena.reset();
+  for (let index = 0; index < 120; index += 1) arena.stepOnce();
+  const snapshot = arena.snapshot();
+  assert.equal(snapshot.gravity, 1);
+  assert.equal(isCampaignChallengeComplete("chain-reaction", snapshot), false);
+  arena.dispose();
+});
+
 test("keeps browser API calls typed and maps structured server errors", async () => {
   const client = createApiClient(async (input) => {
     if (String(input).endsWith("/health")) return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
