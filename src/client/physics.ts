@@ -19,6 +19,7 @@ export interface ArenaSnapshot {
   ambientHeat: number;
   entities: ArenaEntity[];
   lastEvent: LocalEvent | null;
+  events: LocalEvent[];
 }
 
 export type LocalEventType = "collision" | "damage" | "entity-created" | "heat-changed" | "gravity-changed" | "entity-destroyed";
@@ -67,6 +68,7 @@ export class PhysicsArena {
   private ambientHeat = 0;
   private gravity = 1;
   private lastEvent: LocalEvent | null = null;
+  private eventHistory: LocalEvent[] = [];
   private readonly maxEntities = 16;
 
   constructor(onUpdate?: (snapshot: ArenaSnapshot) => void) {
@@ -108,6 +110,7 @@ export class PhysicsArena {
     this.nextEntityNumber = 1;
     this.nextEventNumber = 1;
     this.lastEvent = null;
+    this.eventHistory = [];
     this.addBoundaries();
     this.addEntity("alpha", "core", -2.5, -1.5, 1.8, 0, 100, 0);
     this.addEntity("beta", "core", 2.5, -1.5, -1.8, 0, 100, 0);
@@ -160,6 +163,7 @@ export class PhysicsArena {
         return { id: meta.id, kind: meta.kind, x: position.x, y: position.y, vx: velocity.x, vy: velocity.y, health: meta.health, heat: meta.heat, alive: meta.body.isValid() };
       }),
       lastEvent: this.lastEvent,
+      events: [...this.eventHistory],
     };
   }
 
@@ -207,6 +211,8 @@ export class PhysicsArena {
       const event = queue.shift()!;
       processed += 1;
       this.lastEvent = event;
+      this.eventHistory.push(event);
+      if (this.eventHistory.length > MAX_LOCAL_EVENTS) this.eventHistory.shift();
       const matching = this.rules.filter((rule) => this.matches(rule, event));
       for (const rule of matching) {
         for (const effect of rule.effects) {

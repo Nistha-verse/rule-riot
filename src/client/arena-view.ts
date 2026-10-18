@@ -14,7 +14,7 @@ const COLORS = {
 export class ArenaView {
   readonly canvas: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D;
-  private snapshot: ArenaSnapshot = { step: 0, gravity: 1, ambientHeat: 0, entities: [], lastEvent: null };
+  private snapshot: ArenaSnapshot = { step: 0, gravity: 1, ambientHeat: 0, entities: [], lastEvent: null, events: [] };
   private selectedId: string | null = null;
   private onSelect: ((id: string | null) => void) | undefined;
   private resizeObserver: ResizeObserver | undefined;

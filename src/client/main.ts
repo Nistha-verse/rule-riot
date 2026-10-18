@@ -79,8 +79,8 @@ function currentLevelComplete(): void {
 function evaluateLevel(snapshot: ArenaSnapshot): void {
   if (state.route !== "play" || state.gameStatus !== "running") return;
   const level = campaignChallenges[state.levelIndex];
-  if (level?.id === "first-impact" && snapshot.lastEvent?.type === "collision") currentLevelComplete();
-  if (level?.id === "chain-reaction" && snapshot.lastEvent?.type === "gravity-changed" && snapshot.gravity <= -1) currentLevelComplete();
+  if (level?.id === "first-impact" && snapshot.events.some((event) => event.type === "collision")) currentLevelComplete();
+  if (level?.id === "chain-reaction" && snapshot.events.some((event) => event.type === "gravity-changed") && snapshot.gravity <= -1) currentLevelComplete();
 }
 
 async function runSimulation(): Promise<void> {

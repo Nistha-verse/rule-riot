@@ -59,6 +59,17 @@ test("runs a fixed-step Rapier arena and keeps rule-driven creation bounded", as
   arena.dispose();
 });
 
+test("retains the triggering collision when rules append follow-up events", async () => {
+  const arena = new PhysicsArena();
+  await arena.ready;
+  arena.setRules(campaignChallenges[0]!.rules);
+  for (let index = 0; index < 120; index += 1) arena.stepOnce();
+  const snapshot = arena.snapshot();
+  assert.ok(snapshot.events.some((event) => event.type === "collision"));
+  assert.ok(snapshot.events.some((event) => event.type === "damage"));
+  arena.dispose();
+});
+
 test("keeps browser API calls typed and maps structured server errors", async () => {
   const client = createApiClient(async (input) => {
     if (String(input).endsWith("/health")) return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
